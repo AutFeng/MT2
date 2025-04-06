@@ -1,0 +1,19 @@
+<!-- res/anim/dialog_dim_in.xml -->
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 缩放动画（从中心点放大） -->
+    <scale
+        android:fromXScale="0.0"
+        android:fromYScale="0.0"
+        android:toXScale="1.0"
+        android:toYScale="1.0"
+        android:pivotX="59.2%"
+        android:pivotY="61.5%"
+        android:duration="300"
+        android:interpolator="@android:interpolator/fast_out_slow_in" />
+
+    <!-- 淡入动画 -->
+    <alpha
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0"
+        android:duration="300" />
+</set>

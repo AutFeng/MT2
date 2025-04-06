@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">MT管理器</string>
+    <string name="authorization_dialog_title">授权请求</string>
+    <string name="authorization_dialog_message">为了访问您设备上的文件，您需要手动为 MT 授予「所有文件访问」权限，点击确认后进入设置界面，选择「MT管理器」并开启授权。</string>
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="jump_to_path_title">跳转</string>
+    <string name="paste">粘贴</string>
+    <string name="file_add">复制</string>
+    <string name="file_move">移动</string>
+    <string name="file_delete">删除</string>
+    <string name="file_rename">重命名</string>
+    <string name="file_tools">工具</string>
+    <string name="file_compress">压缩</string>
+    <string name="file_properties">属性</string>
+    <string name="file_share">分享</string>
+    <string name="file_open_with">打开方式…</string>
+    <string name="file_add_to_bookmarks">添加到书签</string>
+    <string name="no_login">未登录</string>
+    <string name="storage_info_text">文件夹: %1$d 文件: %2$d 储存: %3$s</string>
+    <string name="drawer_open">打开侧边栏</string>
+    <string name="drawer_close">关闭侧边栏</string>
+</resources>

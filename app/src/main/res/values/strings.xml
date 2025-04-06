@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">MT Manager</string>
+    <string name="authorization_dialog_title">Permission Request</string>
+    <string name="authorization_dialog_message">To access the files on your device, please manually grant "All files access" permission to MT. Click OK to enter the configuration interface, select "MT Manager" and activate the permission.</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="jump_to_path_title">Jump to path</string>
+    <string name="paste">Paste</string>
+    <string name="file_add">Add</string>
+    <string name="file_move">Move</string>
+    <string name="file_delete">Delete</string>
+    <string name="file_rename">Rename</string>
+    <string name="file_tools">Tools</string>
+    <string name="file_compress">Compress</string>
+    <string name="file_properties">Properties</string>
+    <string name="file_share">Share</string>
+    <string name="file_open_with">Open with…</string>
+    <string name="file_add_to_bookmarks">Add to bookmarks</string>
+    <string name="no_login">Not logged in</string>
+    <string name="storage_info_text">Folders: %1$d Files: %2$d Disk: %3$s</string>
+    <string name="drawer_open">Drawer Open</string>
+    <string name="drawer_close">Drawer Close</string>
+</resources>
