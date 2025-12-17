@@ -34,6 +34,9 @@ import java.io.File
 
 class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
 
+    private var leftAdapter: FileAdapter? = null
+    private var rightAdapter: FileAdapter? = null
+
     private lateinit var currentPathTextView: TextView
     private lateinit var storageInfoTextView: TextView
     private lateinit var TextBar: LinearLayout
@@ -191,10 +194,25 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
     }
 
     private fun refreshList(isLeft: Boolean, newPath: String) {
-        val recyclerView: RecyclerView = if (isLeft) findViewById(R.id.recyclerViewLeft) else findViewById(R.id.recyclerViewRight)
+        val recyclerView: FastScrollRecyclerView =
+            if (isLeft) findViewById(R.id.recyclerViewLeft)
+            else findViewById(R.id.recyclerViewRight)
+
         val files = getFilesFromDirectory(newPath)
-        val adapter = FileAdapter(addParentDirectory(files, newPath), this, isLeft)
-        recyclerView.adapter = adapter
+        val newFileList = addParentDirectory(files, newPath)
+
+        // ✅ 重用 Adapter，只更新数据
+        val adapter = if (isLeft) leftAdapter else rightAdapter
+
+        if (adapter != null) {
+            adapter.updateData(newFileList)
+        } else {
+            // 首次创建
+            val newAdapter = FileAdapter(newFileList, this, isLeft)
+            recyclerView.adapter = newAdapter
+            if (isLeft) leftAdapter = newAdapter else rightAdapter = newAdapter
+        }
+
         updateFolderAndFileCount(newPath, isLeft)
         updateCurrentPath(newPath)
         setStorageInfo(newPath)
@@ -254,26 +272,25 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         }
     }
 
-    // 初始化文件列表
+    // ✅ 优化后的 initializeFileLists 方法
     @SuppressLint("ClickableViewAccessibility")
     private fun initializeFileLists() {
-        val recyclerViewLeft: RecyclerView = findViewById(R.id.recyclerViewLeft)
+        val recyclerViewLeft: FastScrollRecyclerView = findViewById(R.id.recyclerViewLeft)
         recyclerViewLeft.layoutManager = LinearLayoutManager(this)
         val filesLeft = getFilesFromDirectory("/storage/emulated/0/")
-        val adapterLeft = FileAdapter(addParentDirectory(filesLeft, "/storage/emulated/0/"), this, true)
-        recyclerViewLeft.adapter = adapterLeft
+        leftAdapter = FileAdapter(addParentDirectory(filesLeft, "/storage/emulated/0/"), this, true)
+        recyclerViewLeft.adapter = leftAdapter
         leftPath = "/storage/emulated/0/"
         updateFolderAndFileCount(leftPath, true)
 
-        val recyclerViewRight: RecyclerView = findViewById(R.id.recyclerViewRight)
+        val recyclerViewRight: FastScrollRecyclerView = findViewById(R.id.recyclerViewRight)
         recyclerViewRight.layoutManager = LinearLayoutManager(this)
         val filesRight = getFilesFromDirectory("/storage/emulated/0/")
-        val adapterRight = FileAdapter(addParentDirectory(filesRight, "/storage/emulated/0/"), this, false)
-        recyclerViewRight.adapter = adapterRight
+        rightAdapter = FileAdapter(addParentDirectory(filesRight, "/storage/emulated/0/"), this, false)
+        recyclerViewRight.adapter = rightAdapter
         rightPath = "/storage/emulated/0/"
         updateFolderAndFileCount(rightPath, false)
 
-        // Add scroll and touch listeners
         recyclerViewLeft.addOnScrollListener(createScrollListener(true))
         recyclerViewRight.addOnScrollListener(createScrollListener(false))
         recyclerViewLeft.setOnTouchListener(createTouchListener(true))
@@ -282,7 +299,6 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         updateCurrentPath("/storage/emulated/0/")
         setStorageInfo("/storage/emulated/0/")
 
-        // Set the initialization flag to true
         isInitialized = true
     }
 
@@ -327,16 +343,14 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             val currentDirectory = File(currentPathTextView.text.toString())
             val parentPath = currentDirectory.parent ?: return
             val files = getFilesFromDirectory(parentPath)
-            val adapter = FileAdapter(addParentDirectory(files, parentPath), this, isLeft)
+
+            val adapter = if (isLeft) leftAdapter else rightAdapter
+            adapter?.updateData(addParentDirectory(files, parentPath))
 
             if (isLeft) {
-                val recyclerViewLeft: RecyclerView = findViewById(R.id.recyclerViewLeft)
-                recyclerViewLeft.adapter = adapter
                 leftPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
                 updateFolderAndFileCount(leftPath, true)
             } else {
-                val recyclerViewRight: RecyclerView = findViewById(R.id.recyclerViewRight)
-                recyclerViewRight.adapter = adapter
                 rightPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
                 updateFolderAndFileCount(rightPath, false)
             }
@@ -345,16 +359,14 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             setStorageInfo(parentPath)
         } else if (file.isDirectory) {
             val files = getFilesFromDirectory(file.path)
-            val adapter = FileAdapter(addParentDirectory(files, file.path), this, isLeft)
+
+            val adapter = if (isLeft) leftAdapter else rightAdapter
+            adapter?.updateData(addParentDirectory(files, file.path))
 
             if (isLeft) {
-                val recyclerViewLeft: RecyclerView = findViewById(R.id.recyclerViewLeft)
-                recyclerViewLeft.adapter = adapter
                 leftPath = if (file.path.endsWith("/")) file.path else "${file.path}/"
                 updateFolderAndFileCount(leftPath, true)
             } else {
-                val recyclerViewRight: RecyclerView = findViewById(R.id.recyclerViewRight)
-                recyclerViewRight.adapter = adapter
                 rightPath = if (file.path.endsWith("/")) file.path else "${file.path}/"
                 updateFolderAndFileCount(rightPath, false)
             }
