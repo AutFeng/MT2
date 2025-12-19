@@ -8,12 +8,12 @@
         android:toYScale="1.0"
         android:pivotX="59.2%"
         android:pivotY="61.5%"
-        android:duration="300"
+        android:duration="200"
         android:interpolator="@android:interpolator/fast_out_slow_in" />
 
     <!-- 淡入动画 -->
     <alpha
         android:fromAlpha="0.0"
         android:toAlpha="1.0"
-        android:duration="300" />
+        android:duration="200" />
 </set>

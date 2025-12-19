@@ -1,5 +1,6 @@
-package com.alightcreative.mt
+package bin.mt2.plus
 
+import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +19,7 @@ class FileAdapter(
 ) : RecyclerView.Adapter<FileAdapter.FileViewHolder>() {
 
     companion object {
+        @SuppressLint("ConstantLocale")
         private val dateFormat = SimpleDateFormat("yy-MM-dd HH:mm", Locale.getDefault())
     }
 
@@ -41,18 +43,27 @@ class FileAdapter(
 
     override fun onBindViewHolder(holder: FileViewHolder, position: Int) {
         val customFile = files[position]
-        holder.fileName.text = customFile.file.name
+
+        // 处理文件名显示
+        val fileName = customFile.file.name
+        val maxLength = 42 // 最大字符数
+        val displayName = if (fileName.length > maxLength) {
+            fileName.substring(0, maxLength - 3) + "..."
+        } else {
+            fileName
+        }
+
+        holder.fileName.text = displayName
 
         // 处理时间显示
         if (customFile.isParent) {
             holder.fileTime.visibility = View.INVISIBLE
         } else {
             holder.fileTime.visibility = View.VISIBLE
-            //  直接使用 companion 的 dateFormat，避免重复创建
             holder.fileTime.text = dateFormat.format(customFile.file.lastModified())
         }
 
-        //  使用缓存的 View 引用
+        // 设置图标
         if (customFile.file.isDirectory) {
             holder.frameLayout.setBackgroundResource(R.drawable.rounded_rectangle)
             holder.fileIcon.setImageResource(R.drawable.baseline_folder_24)
@@ -71,7 +82,7 @@ class FileAdapter(
 
     override fun getItemCount() = files.size
 
-    //  新增：使用 DiffUtil 更新数据
+    //  新增:使用 DiffUtil 更新数据
     fun updateData(newFiles: List<CustomFile>) {
         val diffCallback = FileDiffCallback(files, newFiles)
         val diffResult = DiffUtil.calculateDiff(diffCallback)

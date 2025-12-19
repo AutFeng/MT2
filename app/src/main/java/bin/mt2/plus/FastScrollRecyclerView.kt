@@ -1,4 +1,4 @@
-package com.alightcreative.mt
+package bin.mt2.plus
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -16,30 +16,29 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.abs
 
 /**
- * 自定义 RecyclerView，支持快速滚动条功能
- * 优化点：
- * 1. 减少重复代码，提取通用方法
- * 2. 优化内存使用（避免重复创建对象）
- * 3. 添加详细中文注释
- * 4. 优化滚动逻辑，避免频繁计算
+ * 自定义 RecyclerView,支持快速滚动条功能
  */
 class FastScrollRecyclerView : RecyclerView {
 
     // ==================== 滚动条尺寸配置 ====================
-    private var fastScrollerWidth: Int = 8.dpToPx
-    private var fastScrollerMargin: Int = 0.dpToPx
-    private var fastScrollerCornerRadius: Int = 0.dpToPx
-    private var fastScrollerMinHeight: Int = 48.dpToPx
-    private var fastScrollerMaxHeight: Int = 52.dpToPx
-    private var touchAreaExtension: Int = 16.dpToPx // 触摸区域扩展像素
+    private var fastScrollerWidth: Int = dpToPx(8)
+    private var fastScrollerMargin: Int = dpToPx(0)
+    private var fastScrollerCornerRadius: Int = dpToPx(0)
+    private var fastScrollerMinHeight: Int = dpToPx(34)
+    private var fastScrollerMaxHeight: Int = dpToPx(48)
+    private var touchAreaExtension: Int = dpToPx(6) // 触摸区域扩展像素
+
+    // ==================== 配置参数 ====================
+    private var itemCountThreshold: Int = 45 // item数量阈值,超过此值才显示滚动条
+    private var isScrollbarEnabled: Boolean = true // 是否启用滚动条功能
 
     // ==================== 画笔对象 ====================
     private val fastScrollerPaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#888888") // 正常状态：灰色
+        color = Color.parseColor("#888888") // 正常状态:灰色
     }
 
     private val fastScrollerDraggingPaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#42A5F5") // 拖动状态：蓝色
+        color = Color.parseColor("#42A5F5") // 拖动状态:蓝色
     }
 
     // ==================== 滚动条矩形区域 ====================
@@ -57,7 +56,7 @@ class FastScrollRecyclerView : RecyclerView {
     private var hideAnimator: android.animation.ValueAnimator? = null
 
     // ==================== 滚动控制 ====================
-    private var lastScrollPosition: Int = -1 // 上次滚动位置，避免频繁滚动
+    private var lastScrollPosition: Int = -1 // 上次滚动位置,避免频繁滚动
 
     // ==================== 定时器相关 ====================
     private val handler: Handler = Handler(Looper.getMainLooper())
@@ -70,7 +69,7 @@ class FastScrollRecyclerView : RecyclerView {
 
     /**
      * 初始化方法
-     * 设置滚动监听，初始化矩形区域
+     * 设置滚动监听,初始化矩形区域
      */
     private fun init() {
         currentFastScrollerRect.set(fastScrollerRect)
@@ -78,21 +77,73 @@ class FastScrollRecyclerView : RecyclerView {
 
         addOnScrollListener(object : OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (!isDraggingFastScroller) {
-                    updateFastScrollerPosition()
+                // 总是更新滚动条位置
+                updateFastScrollerPosition()
+
+                // 有滚动时才显示滚动条(确保不在拖动状态时且item数量足够)
+                if (abs(dy) > 0 && shouldShowFastScroller() && !isDraggingFastScroller) {
+                    showFastScrollerOnScroll()
                 }
             }
 
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 when (newState) {
-                    SCROLL_STATE_IDLE -> startHideFastScrollerTimer() // 停止滚动后开始隐藏计时
-                    else -> {
+                    SCROLL_STATE_IDLE -> {
+                        // 停止滚动后开始隐藏计时
+                        startHideFastScrollerTimer()
+                    }
+                    SCROLL_STATE_DRAGGING -> {
+                        // 手动拖动时立即显示滚动条
                         cancelHideFastScrollerTimer()
-                        if (isHiding) cancelHideAnimation() // 取消正在进行的隐藏动画
+                        cancelHideAnimation()
+                        if (shouldShowFastScroller() && !isFastScrollerVisible) {
+                            isFastScrollerVisible = true
+                            isHiding = false
+                            hideAnimationProgress = 0f
+                            updateFastScrollerPosition()
+                        }
+                    }
+                    SCROLL_STATE_SETTLING -> {
+                        // 惯性滚动时取消隐藏
+                        cancelHideFastScrollerTimer()
+                        cancelHideAnimation()
                     }
                 }
             }
         })
+    }
+
+    /**
+     * 判断是否应该显示滚动条
+     * 条件:1.功能启用 2.有可滚动内容 3.item数量超过阈值
+     */
+    private fun shouldShowFastScroller(): Boolean {
+        return isScrollbarEnabled &&
+                hasScrollableContent() &&
+                getItemCount() > itemCountThreshold
+    }
+
+    /**
+     * 获取当前item数量
+     */
+    private fun getItemCount(): Int {
+        return adapter?.itemCount ?: 0
+    }
+
+    /**
+     * 滚动时显示滚动条
+     */
+    private fun showFastScrollerOnScroll() {
+        cancelHideFastScrollerTimer()
+        cancelHideAnimation()
+
+        if (shouldShowFastScroller() && !isFastScrollerVisible) {
+            isFastScrollerVisible = true
+            isHiding = false
+            hideAnimationProgress = 0f
+            updateFastScrollerPosition()
+            invalidateFastScrollerArea()
+        }
     }
 
     // ==================== 绘制相关 ====================
@@ -115,18 +166,18 @@ class FastScrollRecyclerView : RecyclerView {
      * 判断是否需要绘制滚动条
      */
     private fun shouldDrawFastScroller(): Boolean {
-        return isFastScrollerVisible || isHiding
+        return (isFastScrollerVisible || isHiding) && shouldShowFastScroller()
     }
 
     /**
-     * 获取当前绘制的矩形（考虑动画）
+     * 获取当前绘制的矩形(考虑动画)
      */
     private fun getCurrentRect(): RectF {
         return if (isHiding) currentFastScrollerRect else fastScrollerRect
     }
 
     /**
-     * 获取当前绘制的画笔（考虑状态）
+     * 获取当前绘制的画笔(考虑状态)
      */
     private fun getCurrentPaint(): Paint {
         val paint = if (isDraggingFastScroller) fastScrollerDraggingPaint else fastScrollerPaint
@@ -137,6 +188,11 @@ class FastScrollRecyclerView : RecyclerView {
     // ==================== 触摸事件处理 ====================
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        // 如果滚动条功能未启用或item数量不足,直接使用父类处理
+        if (!shouldShowFastScroller()) {
+            return super.onTouchEvent(e)
+        }
+
         val x = e.x
         val y = e.y
 
@@ -213,7 +269,7 @@ class FastScrollRecyclerView : RecyclerView {
         cancelHideFastScrollerTimer()
         cancelHideAnimation()
 
-        if (hasScrollableContent() && !isFastScrollerVisible) {
+        if (shouldShowFastScroller() && !isFastScrollerVisible) {
             isFastScrollerVisible = true
             isHiding = false
             hideAnimationProgress = 0f
@@ -234,18 +290,18 @@ class FastScrollRecyclerView : RecyclerView {
      * 判断是否在滚动条区域内
      */
     private fun isInFastScrollerArea(x: Float, y: Float): Boolean {
-        return isCoordinateInExtendedArea(x, y, touchAreaExtension)
+        return shouldShowFastScroller() && isCoordinateInExtendedArea(x, y, touchAreaExtension)
     }
 
     /**
      * 判断是否在滚动条附近区域
      */
     private fun isNearFastScrollerArea(x: Float, y: Float): Boolean {
-        return isCoordinateInExtendedArea(x, y, touchAreaExtension * 2)
+        return shouldShowFastScroller() && isCoordinateInExtendedArea(x, y, touchAreaExtension * 2)
     }
 
     /**
-     * 通用方法：判断坐标是否在扩展区域内
+     * 通用方法:判断坐标是否在扩展区域内
      * @param extension 扩展像素数
      */
     private fun isCoordinateInExtendedArea(x: Float, y: Float, extension: Int): Boolean {
@@ -270,7 +326,7 @@ class FastScrollRecyclerView : RecyclerView {
      * @param isInitial 是否为初始触摸
      */
     private fun handleFastScrollerTouch(y: Float, isInitial: Boolean) {
-        if (!hasScrollableContent()) return
+        if (!shouldShowFastScroller()) return
 
         val scrollRange = computeVerticalScrollRange()
         val scrollExtent = computeVerticalScrollExtent()
@@ -314,7 +370,7 @@ class FastScrollRecyclerView : RecyclerView {
     }
 
     /**
-     * 直接滚动到指定位置（无动画）
+     * 直接滚动到指定位置(无动画)
      */
     private fun directScrollTo(scrollY: Int) {
         val layoutManager = layoutManager
@@ -322,16 +378,27 @@ class FastScrollRecyclerView : RecyclerView {
 
         when (layoutManager) {
             is LinearLayoutManager -> {
-                // 使用 scrollToPositionWithOffset 精确控制位置
                 val totalItemCount = adapter.itemCount
                 if (totalItemCount > 0) {
-                    val targetPosition = (scrollY.toFloat() / computeVerticalScrollRange() * totalItemCount).toInt()
-                    val safePosition = targetPosition.coerceIn(0, totalItemCount - 1)
-                    layoutManager.scrollToPositionWithOffset(safePosition, 0)
+                    val scrollRange = computeVerticalScrollRange()
+                    val scrollExtent = computeVerticalScrollExtent()
+                    val maxScrollY = scrollRange - scrollExtent
+
+                    // 如果目标滚动位置接近底部(超过95%),直接滚动到最底部
+                    if (scrollY >= maxScrollY * 0.95f) {
+                        val currentOffset = computeVerticalScrollOffset()
+                        val diff = maxScrollY - currentOffset
+                        if (abs(diff) > 0) scrollBy(0, diff)
+                    } else {
+                        // 否则使用 scrollToPositionWithOffset 精确控制位置
+                        val targetPosition = (scrollY.toFloat() / scrollRange * totalItemCount).toInt()
+                        val safePosition = targetPosition.coerceIn(0, totalItemCount - 1)
+                        layoutManager.scrollToPositionWithOffset(safePosition, 0)
+                    }
                 }
             }
             else -> {
-                // 回退方法：使用 scrollBy
+                // 回退方法:使用 scrollBy
                 val diff = scrollY - computeVerticalScrollOffset()
                 if (abs(diff) > 0) scrollBy(0, diff)
             }
@@ -343,7 +410,7 @@ class FastScrollRecyclerView : RecyclerView {
      * 拖动过程中更新滚动条位置
      */
     private fun updateFastScrollerPositionDuringDrag(y: Float) {
-        if (!hasScrollableContent()) return
+        if (!shouldShowFastScroller()) return
 
         val scrollRange = computeVerticalScrollRange()
         val scrollExtent = computeVerticalScrollExtent()
@@ -364,10 +431,10 @@ class FastScrollRecyclerView : RecyclerView {
     }
 
     /**
-     * 常规更新滚动条位置（基于滚动偏移量）
+     * 常规更新滚动条位置(基于滚动偏移量)
      */
     private fun updateFastScrollerPosition() {
-        if (!hasScrollableContent()) {
+        if (!shouldShowFastScroller()) {
             isFastScrollerVisible = false
             isHiding = false
             hideAnimationProgress = 0f
@@ -400,7 +467,7 @@ class FastScrollRecyclerView : RecyclerView {
     }
 
     /**
-     * 重绘滚动条区域（性能优化）
+     * 重绘滚动条区域(性能优化)
      */
     private fun invalidateFastScrollerArea() {
         val left = width - fastScrollerMargin - fastScrollerWidth - touchAreaExtension
@@ -414,7 +481,7 @@ class FastScrollRecyclerView : RecyclerView {
 
     // ==================== 动画控制 ====================
     /**
-     * 开始隐藏动画（向右移动淡出）
+     * 开始隐藏动画(向右移动淡出)
      */
     private fun startHideAnimation() {
         if (!shouldStartHideAnimation()) return
@@ -440,7 +507,7 @@ class FastScrollRecyclerView : RecyclerView {
      * 判断是否应该开始隐藏动画
      */
     private fun shouldStartHideAnimation(): Boolean {
-        return isFastScrollerVisible && !isHiding && !isTouchingRecyclerView
+        return isFastScrollerVisible && !isHiding && !isTouchingRecyclerView && shouldShowFastScroller()
     }
 
     /**
@@ -513,7 +580,7 @@ class FastScrollRecyclerView : RecyclerView {
      * 判断是否应该启动隐藏定时器
      */
     private fun shouldStartHideTimer(): Boolean {
-        return !isDraggingFastScroller && isFastScrollerVisible && !isTouchingRecyclerView
+        return !isDraggingFastScroller && isFastScrollerVisible && !isTouchingRecyclerView && shouldShowFastScroller()
     }
 
     // ==================== 生命周期 ====================
@@ -524,10 +591,11 @@ class FastScrollRecyclerView : RecyclerView {
         hideAnimator?.cancel()
     }
 
-    // ==================== 工具扩展 ====================
+    // ==================== 工具方法 ====================
     /**
-     * dp转px的扩展属性
+     * dp转px
      */
-    private val Int.dpToPx: Int
-        get() = (this * context.resources.displayMetrics.density).toInt()
+    private fun dpToPx(dp: Int): Int {
+        return (dp * context.resources.displayMetrics.density).toInt()
+    }
 }

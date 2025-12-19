@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.alightcreative.mt"
+    namespace = "bin.mt2.plus"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.alightcreative.mt"
+        applicationId = "bin.mt2.plus"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -85,6 +85,7 @@ android {
 }
 
 dependencies {
+    implementation ("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation(libs.io.coil.kt.coil)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

@@ -1,4 +1,4 @@
-package com.alightcreative.mt
+package bin.mt2.plus
 
 import android.annotation.SuppressLint
 import android.app.AlertDialog
@@ -27,6 +27,7 @@ import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.navigation.NavigationView
@@ -109,6 +110,15 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
 
     private fun determineIfLeft(): Boolean {
         return currentPathTextView.text.toString() == leftPath
+    }
+
+    // 截断路径显示，保留后46个字符，前面加上...
+    private fun truncatePath(path: String): String {
+        return if (path.length > 46) {
+            "..." + path.takeLast(46)
+        } else {
+            path
+        }
     }
 
     @SuppressLint("DiscouragedPrivateApi")
@@ -272,7 +282,6 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         }
     }
 
-    // ✅ 优化后的 initializeFileLists 方法
     @SuppressLint("ClickableViewAccessibility")
     private fun initializeFileLists() {
         val recyclerViewLeft: FastScrollRecyclerView = findViewById(R.id.recyclerViewLeft)
@@ -291,6 +300,13 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         rightPath = "/storage/emulated/0/"
         updateFolderAndFileCount(rightPath, false)
 
+        // 添加左右滑动支持
+        val leftTouchHelper = ItemTouchHelper(ItemTouchHelperCallback())
+        leftTouchHelper.attachToRecyclerView(recyclerViewLeft)
+
+        val rightTouchHelper = ItemTouchHelper(ItemTouchHelperCallback())
+        rightTouchHelper.attachToRecyclerView(recyclerViewRight)
+
         recyclerViewLeft.addOnScrollListener(createScrollListener(true))
         recyclerViewRight.addOnScrollListener(createScrollListener(false))
         recyclerViewLeft.setOnTouchListener(createTouchListener(true))
@@ -302,17 +318,17 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         isInitialized = true
     }
 
-    // 创建滚动监听器
+    // 在滚动监听器中修改
     private fun createScrollListener(isLeft: Boolean): RecyclerView.OnScrollListener {
         return object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
                 if (dy != 0) {
                     if (isLeft) {
-                        currentPathTextView.text = leftPath
+                        currentPathTextView.text = truncatePath(leftPath)  // 使用截断函数
                         storageInfoTextView.text = getString(R.string.storage_info_text, leftFolderCount, leftFileCount, getStorageInfo(leftPath))
                     } else {
-                        currentPathTextView.text = rightPath
+                        currentPathTextView.text = truncatePath(rightPath)  // 使用截断函数
                         storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
                     }
                 }
@@ -326,10 +342,10 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         return View.OnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_DOWN) {
                 if (isLeft) {
-                    currentPathTextView.text = leftPath
+                    currentPathTextView.text = truncatePath(leftPath)  // 使用截断函数
                     storageInfoTextView.text = getString(R.string.storage_info_text, leftFolderCount, leftFileCount, getStorageInfo(leftPath))
                 } else {
-                    currentPathTextView.text = rightPath
+                    currentPathTextView.text = truncatePath(rightPath)  // 使用截断函数
                     storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
                 }
             }
@@ -339,8 +355,17 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
 
     // 处理文件项点击事件
     override fun onItemClick(file: File, isLeft: Boolean) {
+        if (isLeft) {
+            currentPathTextView.text = truncatePath(leftPath)  // 使用截断函数
+            storageInfoTextView.text = getString(R.string.storage_info_text, leftFolderCount, leftFileCount, getStorageInfo(leftPath))
+        } else {
+            currentPathTextView.text = truncatePath(rightPath)  // 使用截断函数
+            storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
+        }
+
         if (file.name == "..") {
-            val currentDirectory = File(currentPathTextView.text.toString())
+            val currentPath = if (isLeft) leftPath else rightPath
+            val currentDirectory = File(currentPath)
             val parentPath = currentDirectory.parent ?: return
             val files = getFilesFromDirectory(parentPath)
 
@@ -350,13 +375,14 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             if (isLeft) {
                 leftPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
                 updateFolderAndFileCount(leftPath, true)
+                updateCurrentPath(parentPath)
+                setStorageInfo(parentPath)
             } else {
                 rightPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
                 updateFolderAndFileCount(rightPath, false)
+                updateCurrentPath(parentPath)
+                setStorageInfo(parentPath)
             }
-
-            updateCurrentPath(parentPath)
-            setStorageInfo(parentPath)
         } else if (file.isDirectory) {
             val files = getFilesFromDirectory(file.path)
 
@@ -366,20 +392,21 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             if (isLeft) {
                 leftPath = if (file.path.endsWith("/")) file.path else "${file.path}/"
                 updateFolderAndFileCount(leftPath, true)
+                updateCurrentPath(file.path)
+                setStorageInfo(file.path)
             } else {
                 rightPath = if (file.path.endsWith("/")) file.path else "${file.path}/"
                 updateFolderAndFileCount(rightPath, false)
+                updateCurrentPath(file.path)
+                setStorageInfo(file.path)
             }
-
-            updateCurrentPath(file.path)
-            setStorageInfo(file.path)
         }
     }
 
     // 处理文件项长按事件
     override fun onItemLongClick(file: File, isLeft: Boolean): Boolean {
         if (file.name != "..") {
-            showFileOptionsDialog(file)
+            showFileOptionsDialog()
             return true
         }
         return false
@@ -387,7 +414,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
 
     // 显示文件选项对话框
     @SuppressLint("SetTextI18n")
-    private fun showFileOptionsDialog(file: File) {
+    private fun showFileOptionsDialog() {
         val dialog = Dialog(this)
         dialog.setContentView(R.layout.dialog_file_options)
 
@@ -436,10 +463,10 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         }
     }
 
-    // 更新当前路径
+    // 在更新当前路径的方法中修改
     private fun updateCurrentPath(path: String) {
         val updatedPath = if (path.endsWith("/")) path else "$path/"
-        currentPathTextView.text = updatedPath
+        currentPathTextView.text = truncatePath(updatedPath)  // 使用截断函数
     }
 
     // 设置存储信息
