@@ -1,9 +1,14 @@
-package bin.mt2.plus
+package bin.mt2.plus.callback
 
 import android.graphics.Canvas
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
+import bin.mt2.plus.R
 
+/**
+ * RecyclerView滑动手势回调
+ * 限制滑动距离并提供平滑复位动画
+ */
 class ItemTouchHelperCallback : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
 
     private var maxSwipeDistance = 35f // dp - 限制在35dp内

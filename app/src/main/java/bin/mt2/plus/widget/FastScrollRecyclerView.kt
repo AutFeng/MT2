@@ -1,4 +1,4 @@
-package bin.mt2.plus
+package bin.mt2.plus.widget
 
 import android.annotation.SuppressLint
 import android.content.Context

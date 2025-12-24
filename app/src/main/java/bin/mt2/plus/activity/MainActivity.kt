@@ -1,4 +1,4 @@
-package bin.mt2.plus
+package bin.mt2.plus.activity
 
 import android.annotation.SuppressLint
 import android.app.AlertDialog
@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
+import android.os.Looper
 import android.os.StatFs
 import android.provider.Settings
 import android.view.MotionEvent
@@ -30,6 +31,12 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import bin.mt2.plus.R
+import bin.mt2.plus.adapter.FileAdapter
+import bin.mt2.plus.callback.ItemTouchHelperCallback
+import bin.mt2.plus.model.CustomFile
+import bin.mt2.plus.widget.FastScrollRecyclerView
+import bin.mt2.plus.widget.PullRefreshLayout
 import com.google.android.material.navigation.NavigationView
 import java.io.File
 
@@ -38,6 +45,8 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
     private var leftAdapter: FileAdapter? = null
     private var rightAdapter: FileAdapter? = null
 
+    private lateinit var pullRefreshLeft: PullRefreshLayout
+    private lateinit var pullRefreshRight: PullRefreshLayout
     private lateinit var currentPathTextView: TextView
     private lateinit var storageInfoTextView: TextView
     private lateinit var TextBar: LinearLayout
@@ -71,6 +80,15 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         }
 
         // 初始化视图
+        pullRefreshLeft = findViewById(R.id.pullRefreshLeft)
+        pullRefreshRight = findViewById(R.id.pullRefreshRight)
+
+        // 设置左右列表的移动方向和名称
+        pullRefreshLeft.setLeftToRight(true)   // 左列表：从左到右
+        pullRefreshLeft.setSideName("左侧")
+        pullRefreshRight.setLeftToRight(false)  // 右列表：从右到左
+        pullRefreshRight.setSideName("右侧")
+
         currentPathTextView = findViewById(R.id.currentPathTextView)
         storageInfoTextView = findViewById(R.id.storageInfoTextView)
         drawerLayout = findViewById(R.id.drawerLayout)
@@ -194,7 +212,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             editText.requestFocus()
             editText.selectAll()
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            Handler().postDelayed({
+            Handler(Looper.getMainLooper()).postDelayed({
                 imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
             }, 100)
         }
@@ -311,6 +329,34 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         recyclerViewRight.addOnScrollListener(createScrollListener(false))
         recyclerViewLeft.setOnTouchListener(createTouchListener(true))
         recyclerViewRight.setOnTouchListener(createTouchListener(false))
+
+        // 设置下拉刷新监听器
+        // 设置开始下拉时的列表切换监听器（只要开始下拉就切换）
+        pullRefreshLeft.onPullStartListener = {
+            // 切换到左列表，更新顶部信息显示
+            updateCurrentPath(leftPath)
+            setStorageInfo(leftPath)
+        }
+        pullRefreshLeft.setOnRefreshListener {
+            Handler(Looper.getMainLooper()).postDelayed({
+                // 刷新左列表
+                refreshList(true, leftPath)
+                pullRefreshLeft.finishRefresh()
+            }, 0)
+        }
+
+        pullRefreshRight.onPullStartListener = {
+            // 切换到右列表，更新顶部信息显示
+            updateCurrentPath(rightPath)
+            setStorageInfo(rightPath)
+        }
+        pullRefreshRight.setOnRefreshListener {
+            Handler(Looper.getMainLooper()).postDelayed({
+                // 刷新右列表
+                refreshList(false, rightPath)
+                pullRefreshRight.finishRefresh()
+            }, 0)
+        }
 
         updateCurrentPath("/storage/emulated/0/")
         setStorageInfo("/storage/emulated/0/")
@@ -516,5 +562,15 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         val availableGB = availableBytes / (1024 * 1024 * 1024)
         val totalGB = totalBytes / (1024 * 1024 * 1024)
         return String.format("%.2fG/%.2fG", availableGB, totalGB)
+    }
+
+    /**
+     * Activity销毁时清理资源，防止内存泄漏
+     */
+    override fun onDestroy() {
+        super.onDestroy()
+        // 清理对话框引用
+        permissionDialog?.dismiss()
+        permissionDialog = null
     }
 }
