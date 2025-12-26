@@ -18,8 +18,8 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_gravity="start|center_vertical">
+                android:layout_gravity="start|center_vertical"
+                android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/menuIcon"
@@ -35,9 +35,9 @@
                     android:id="@+id/TextBar"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
                     android:orientation="vertical"
                     android:paddingStart="11dp"
-                    android:layout_gravity="center_vertical"
                     tools:ignore="RtlSymmetry">
 
                     <TextView
@@ -45,25 +45,25 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="@color/white"
-                        android:textSize="18sp"/>
+                        android:textSize="18sp" />
 
                     <TextView
                         android:id="@+id/storageInfoTextView"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:paddingTop="2dp"
                         android:textColor="@color/white"
-                        android:textSize="11sp"
-                        android:paddingTop="2dp" />
+                        android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
 
             <ImageView
                 android:layout_width="42dp"
                 android:layout_height="42dp"
-                android:src="@drawable/baseline_more_vert_32"
                 android:layout_gravity="end"
-                android:padding="8dp"
                 android:layout_marginEnd="3.5dp"
+                android:padding="8dp"
+                android:src="@drawable/baseline_more_vert_32"
                 app:tint="@color/white" />
         </androidx.appcompat.widget.Toolbar>
 
@@ -73,31 +73,96 @@
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <bin.mt2.plus.widget.PullRefreshLayout
-                android:id="@+id/pullRefreshLeft"
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1">
 
-                <bin.mt2.plus.widget.FastScrollRecyclerView
-                    android:id="@+id/recyclerViewLeft"
+                <bin.mt2.plus.widget.PullRefreshLayout
+                    android:id="@+id/pullRefreshLeft"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@color/white" />
-            </bin.mt2.plus.widget.PullRefreshLayout>
+                    android:layout_height="match_parent">
 
-            <bin.mt2.plus.widget.PullRefreshLayout
-                android:id="@+id/pullRefreshRight"
+                    <bin.mt2.plus.widget.FastScrollRecyclerView
+                        android:id="@+id/recyclerViewLeft"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@color/white" />
+                </bin.mt2.plus.widget.PullRefreshLayout>
+
+                <bin.mt2.plus.widget.BezierGradientView
+                    android:id="@+id/left_gradientTop"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:alpha="0.4"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <bin.mt2.plus.widget.BezierGradientView
+                    android:id="@+id/left_gradientBottom"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:alpha="0.4"
+                    android:visibility="gone"
+                    app:direction="bottom_to_top"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <bin.mt2.plus.widget.BezierGradientView
+                    android:id="@+id/left_gradientRight"
+                    android:layout_width="4dp"
+                    android:layout_height="match_parent"
+                    android:alpha="0.4"
+                    android:visibility="gone"
+                    app:direction="right_to_left"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1">
 
-                <bin.mt2.plus.widget.FastScrollRecyclerView
-                    android:id="@+id/recyclerViewRight"
+                <bin.mt2.plus.widget.PullRefreshLayout
+                    android:id="@+id/pullRefreshRight"
                     android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <bin.mt2.plus.widget.FastScrollRecyclerView
+                        android:id="@+id/recyclerViewRight"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@color/white" />
+                </bin.mt2.plus.widget.PullRefreshLayout>
+
+                <bin.mt2.plus.widget.BezierGradientView
+                    android:id="@+id/right_gradientTop"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:alpha="0.4"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <bin.mt2.plus.widget.BezierGradientView
+                    android:id="@+id/right_gradientBottom"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:alpha="0.4"
+                    android:visibility="gone"
+                    app:direction="bottom_to_top"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <bin.mt2.plus.widget.BezierGradientView
+                    android:id="@+id/right_gradientLeft"
+                    android:layout_width="4dp"
                     android:layout_height="match_parent"
-                    android:background="@color/white" />
-            </bin.mt2.plus.widget.PullRefreshLayout>
+                    android:alpha="0.4"
+                    android:visibility="gone"
+                    app:direction="left_to_right"
+                    app:layout_constraintStart_toStartOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
         </LinearLayout>
 
         <View
@@ -115,47 +180,47 @@
                 android:layout_width="match_parent"
                 android:layout_height="2dp"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center">
+                android:gravity="center"
+                android:orientation="horizontal">
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:scaleType="centerInside"
                     android:src="@drawable/baseline_keyboard_arrow_left_24"
-                    android:scaleType="centerInside"
-                    app:tint="@color/gray"  />
+                    app:tint="@color/gray" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:scaleType="centerInside"
                     android:src="@drawable/baseline_keyboard_arrow_right_24"
-                    android:scaleType="centerInside"
-                    app:tint="@color/gray"  />
+                    app:tint="@color/gray" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:scaleType="centerInside"
                     android:src="@drawable/baseline_add_24"
-                    android:scaleType="centerInside"
-                    app:tint="@color/gray"  />
+                    app:tint="@color/gray" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:scaleType="centerInside"
                     android:src="@drawable/baseline_arrow_team_24"
-                    android:scaleType="centerInside"
-                    app:tint="@color/gray"  />
+                    app:tint="@color/gray" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:src="@drawable/baseline_arrow_upward_24"
                     android:scaleType="centerInside"
+                    android:src="@drawable/baseline_arrow_upward_24"
                     app:tint="@color/gray" />
             </LinearLayout>
         </LinearLayout>

@@ -36,7 +36,7 @@ class PullRefreshLayout @JvmOverloads constructor(
 
     companion object {
         /** 下拉阻尼系数：控制下拉的"重量感"，值越小越难拉 */
-        private const val PULL_RESISTANCE = 0.3f
+        private const val PULL_RESISTANCE = 0.4f
 
         /** 最大下拉距离（约3个item的高度，单位：dp） */
         private const val MAX_PULL_DISTANCE = 240f
@@ -230,15 +230,6 @@ class PullRefreshLayout @JvmOverloads constructor(
             }
             start()
         }
-
-        // 显示提示和触发刷新回调
-        val message = if (sideName.isNotEmpty()) {
-            "刷新${sideName}列表…"
-        } else {
-            "触发刷新…"
-        }
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-
         // 触发刷新回调
         refreshListener?.onRefresh()
     }

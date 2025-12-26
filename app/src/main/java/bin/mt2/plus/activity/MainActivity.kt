@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
-import android.os.Looper
 import android.os.StatFs
 import android.provider.Settings
 import android.view.MotionEvent
@@ -35,6 +34,7 @@ import bin.mt2.plus.R
 import bin.mt2.plus.adapter.FileAdapter
 import bin.mt2.plus.callback.ItemTouchHelperCallback
 import bin.mt2.plus.model.CustomFile
+import bin.mt2.plus.widget.BezierGradientView
 import bin.mt2.plus.widget.FastScrollRecyclerView
 import bin.mt2.plus.widget.PullRefreshLayout
 import com.google.android.material.navigation.NavigationView
@@ -56,6 +56,14 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
     private lateinit var drawerToggle: ActionBarDrawerToggle
     private lateinit var leftPath: String
     private lateinit var rightPath: String
+
+    private lateinit var leftTopBezierGradient: BezierGradientView
+    private lateinit var leftBottomBezierGradient: BezierGradientView
+    private lateinit var rightTopBezierGradient: BezierGradientView
+    private lateinit var rightBottomBezierGradient: BezierGradientView
+    private lateinit var leftRithtBezierGradient: BezierGradientView
+    private lateinit var rightLeftBezierGradient: BezierGradientView
+
 
     private var isInitialized = false
 
@@ -83,11 +91,9 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         pullRefreshLeft = findViewById(R.id.pullRefreshLeft)
         pullRefreshRight = findViewById(R.id.pullRefreshRight)
 
-        // 设置左右列表的移动方向和名称
+        // 设置左右列表的移动方向
         pullRefreshLeft.setLeftToRight(true)   // 左列表：从左到右
-        pullRefreshLeft.setSideName("左侧")
         pullRefreshRight.setLeftToRight(false)  // 右列表：从右到左
-        pullRefreshRight.setSideName("右侧")
 
         currentPathTextView = findViewById(R.id.currentPathTextView)
         storageInfoTextView = findViewById(R.id.storageInfoTextView)
@@ -113,9 +119,11 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             override fun onDrawerOpened(drawerView: View) {
                 drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
             }
+
             override fun onDrawerClosed(drawerView: View) {
                 drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             }
+
             override fun onDrawerStateChanged(newState: Int) {}
         })
 
@@ -124,6 +132,25 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             val isLeft = determineIfLeft()
             showEditPathDialog(this, currentPathTextView.text.toString(), isLeft)
         }
+
+        //  左右列表添加阴影事件
+        val leftRecycle: FastScrollRecyclerView = findViewById(R.id.recyclerViewLeft)
+        val rightRecycle: FastScrollRecyclerView = findViewById(R.id.recyclerViewRight)
+        leftTopBezierGradient = findViewById(R.id.left_gradientTop)
+        leftBottomBezierGradient = findViewById(R.id.left_gradientBottom)
+        leftRithtBezierGradient = findViewById(R.id.left_gradientRight)
+        rightTopBezierGradient = findViewById(R.id.right_gradientTop)
+        rightBottomBezierGradient = findViewById(R.id.right_gradientBottom)
+        rightLeftBezierGradient = findViewById(R.id.right_gradientLeft)
+
+        // 默认右边阴影
+        rightTopBezierGradient.visibility = View.VISIBLE
+        rightBottomBezierGradient.visibility = View.VISIBLE
+        rightLeftBezierGradient.visibility = View.VISIBLE
+        leftTopBezierGradient.visibility = View.GONE
+        leftBottomBezierGradient.visibility = View.GONE
+        leftRithtBezierGradient.visibility = View.GONE
+
     }
 
     private fun determineIfLeft(): Boolean {
@@ -212,7 +239,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             editText.requestFocus()
             editText.selectAll()
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            Handler(Looper.getMainLooper()).postDelayed({
+            Handler().postDelayed({
                 imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
             }, 100)
         }
@@ -244,6 +271,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         updateFolderAndFileCount(newPath, isLeft)
         updateCurrentPath(newPath)
         setStorageInfo(newPath)
+
     }
 
     // 扩展函数：dp转px
@@ -281,6 +309,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         permissionDialog?.setCancelable(false)
         permissionDialog?.setCanceledOnTouchOutside(false)
         permissionDialog?.show()
+
     }
 
     override fun onResume() {
@@ -331,28 +360,15 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         recyclerViewRight.setOnTouchListener(createTouchListener(false))
 
         // 设置下拉刷新监听器
-        // 设置开始下拉时的列表切换监听器（只要开始下拉就切换）
-        pullRefreshLeft.onPullStartListener = {
-            // 切换到左列表，更新顶部信息显示
-            updateCurrentPath(leftPath)
-            setStorageInfo(leftPath)
-        }
         pullRefreshLeft.setOnRefreshListener {
-            Handler(Looper.getMainLooper()).postDelayed({
-                // 刷新左列表
+            Handler().postDelayed({
                 refreshList(true, leftPath)
                 pullRefreshLeft.finishRefresh()
             }, 0)
         }
 
-        pullRefreshRight.onPullStartListener = {
-            // 切换到右列表，更新顶部信息显示
-            updateCurrentPath(rightPath)
-            setStorageInfo(rightPath)
-        }
         pullRefreshRight.setOnRefreshListener {
-            Handler(Looper.getMainLooper()).postDelayed({
-                // 刷新右列表
+            Handler().postDelayed({
                 refreshList(false, rightPath)
                 pullRefreshRight.finishRefresh()
             }, 0)
@@ -362,6 +378,32 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         setStorageInfo("/storage/emulated/0/")
 
         isInitialized = true
+
+        pullRefreshLeft.setOnTouchListener { _, _ ->
+
+            // 默认右边阴影
+            rightTopBezierGradient.visibility = View.VISIBLE
+            rightBottomBezierGradient.visibility = View.VISIBLE
+            rightLeftBezierGradient.visibility = View.VISIBLE
+            leftTopBezierGradient.visibility = View.GONE
+            leftBottomBezierGradient.visibility = View.GONE
+            leftRithtBezierGradient.visibility = View.GONE
+
+            false
+        }
+
+        pullRefreshRight.setOnTouchListener { _, _ ->
+
+            leftTopBezierGradient.visibility = View.VISIBLE
+            leftBottomBezierGradient.visibility = View.VISIBLE
+            leftRithtBezierGradient.visibility = View.VISIBLE
+            rightTopBezierGradient.visibility = View.GONE
+            rightBottomBezierGradient.visibility = View.GONE
+            rightLeftBezierGradient.visibility = View.GONE
+
+            false
+        }
+
     }
 
     // 在滚动监听器中修改
@@ -378,7 +420,28 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
                         storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
                     }
                 }
+
             }
+
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                super.onScrollStateChanged(recyclerView, newState)
+                if (isLeft) {
+                    rightTopBezierGradient.visibility = View.VISIBLE
+                    rightBottomBezierGradient.visibility = View.VISIBLE
+                    rightLeftBezierGradient.visibility = View.VISIBLE
+                    leftTopBezierGradient.visibility = View.GONE
+                    leftBottomBezierGradient.visibility = View.GONE
+                    leftRithtBezierGradient.visibility = View.GONE
+                } else {
+                    leftTopBezierGradient.visibility = View.VISIBLE
+                    leftBottomBezierGradient.visibility = View.VISIBLE
+                    leftRithtBezierGradient.visibility = View.VISIBLE
+                    rightTopBezierGradient.visibility = View.GONE
+                    rightBottomBezierGradient.visibility = View.GONE
+                    rightLeftBezierGradient.visibility = View.GONE
+                }
+            }
+
         }
     }
 
@@ -386,7 +449,25 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
     @SuppressLint("ClickableViewAccessibility")
     private fun createTouchListener(isLeft: Boolean): View.OnTouchListener {
         return View.OnTouchListener { _, event ->
+
+            if (isLeft) {
+                rightTopBezierGradient.visibility = View.VISIBLE
+                rightBottomBezierGradient.visibility = View.VISIBLE
+                rightLeftBezierGradient.visibility = View.VISIBLE
+                leftTopBezierGradient.visibility = View.GONE
+                leftBottomBezierGradient.visibility = View.GONE
+                leftRithtBezierGradient.visibility = View.GONE
+            } else {
+                leftTopBezierGradient.visibility = View.VISIBLE
+                leftBottomBezierGradient.visibility = View.VISIBLE
+                leftRithtBezierGradient.visibility = View.VISIBLE
+                rightTopBezierGradient.visibility = View.GONE
+                rightBottomBezierGradient.visibility = View.GONE
+                rightLeftBezierGradient.visibility = View.GONE
+            }
+
             if (event.action == MotionEvent.ACTION_DOWN) {
+
                 if (isLeft) {
                     currentPathTextView.text = truncatePath(leftPath)  // 使用截断函数
                     storageInfoTextView.text = getString(R.string.storage_info_text, leftFolderCount, leftFileCount, getStorageInfo(leftPath))
@@ -394,6 +475,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
                     currentPathTextView.text = truncatePath(rightPath)  // 使用截断函数
                     storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
                 }
+
             }
             false
         }
@@ -447,6 +529,22 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
                 setStorageInfo(file.path)
             }
         }
+        if (isLeft) {
+            rightTopBezierGradient.visibility = View.VISIBLE
+            rightBottomBezierGradient.visibility = View.VISIBLE
+            rightLeftBezierGradient.visibility = View.VISIBLE
+            leftTopBezierGradient.visibility = View.GONE
+            leftBottomBezierGradient.visibility = View.GONE
+            leftRithtBezierGradient.visibility = View.GONE
+        } else {
+            leftTopBezierGradient.visibility = View.VISIBLE
+            leftBottomBezierGradient.visibility = View.VISIBLE
+            leftRithtBezierGradient.visibility = View.VISIBLE
+            rightTopBezierGradient.visibility = View.GONE
+            rightBottomBezierGradient.visibility = View.GONE
+            rightLeftBezierGradient.visibility = View.GONE
+        }
+
     }
 
     // 处理文件项长按事件
@@ -562,15 +660,5 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         val availableGB = availableBytes / (1024 * 1024 * 1024)
         val totalGB = totalBytes / (1024 * 1024 * 1024)
         return String.format("%.2fG/%.2fG", availableGB, totalGB)
-    }
-
-    /**
-     * Activity销毁时清理资源，防止内存泄漏
-     */
-    override fun onDestroy() {
-        super.onDestroy()
-        // 清理对话框引用
-        permissionDialog?.dismiss()
-        permissionDialog = null
     }
 }
