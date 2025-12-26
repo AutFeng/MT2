@@ -16,6 +16,6 @@
 
 ## 效果图：
 
-![image](demo.jpg)
+![image](demo.png)
 
 ## 项目对各位朋友有帮助的话能否赏个star，拜托拜托了
