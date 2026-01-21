@@ -34,9 +34,11 @@ import bin.mt2.plus.R
 import bin.mt2.plus.adapter.FileAdapter
 import bin.mt2.plus.callback.ItemTouchHelperCallback
 import bin.mt2.plus.model.CustomFile
+import bin.mt2.plus.utils.PathUtils
 import bin.mt2.plus.widget.BezierGradientView
 import bin.mt2.plus.widget.FastScrollRecyclerView
 import bin.mt2.plus.widget.PullRefreshLayout
+import bin.mt2.plus.widget.ScrollbarOverlayView
 import com.google.android.material.navigation.NavigationView
 import java.io.File
 
@@ -63,7 +65,10 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
     private lateinit var rightBottomBezierGradient: BezierGradientView
     private lateinit var leftRithtBezierGradient: BezierGradientView
     private lateinit var rightLeftBezierGradient: BezierGradientView
-
+    private lateinit var toolbar: androidx.appcompat.widget.Toolbar
+    private lateinit var bottomBar: LinearLayout
+    private lateinit var leftScrollbarOverlay: ScrollbarOverlayView
+    private lateinit var rightScrollbarOverlay: ScrollbarOverlayView
 
     private var isInitialized = false
 
@@ -79,12 +84,46 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 设置导航栏和状态栏颜色
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            window.navigationBarColor = ContextCompat.getColor(this, R.color.white)
-            window.statusBarColor = ContextCompat.getColor(this, R.color.toolbar)
-            window.decorView.systemUiVisibility =
-                window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        // 初始化 Toolbar
+        toolbar = findViewById(R.id.toolbar)
+        bottomBar = findViewById(R.id.bottomBar)
+        leftScrollbarOverlay = findViewById(R.id.leftScrollbarContainer)
+        rightScrollbarOverlay = findViewById(R.id.rightScrollbarContainer)
+
+        // 设置沉浸式状态栏和导航栏
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11 及以上
+            window.setDecorFitsSystemWindows(false)
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Android 8.0 及以上
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            )
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            // Android 5.0 及以上
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            )
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        }
+
+        // 设置 Toolbar 的 padding 以适配状态栏
+        toolbar.post {
+            val statusBarHeight = getStatusBarHeight()
+            toolbar.setPadding(0, statusBarHeight, 0, 0)
+            val layoutParams = toolbar.layoutParams
+            layoutParams.height = 56.dpToPx(this) + statusBarHeight
+            toolbar.layoutParams = layoutParams
         }
 
         // 初始化视图
@@ -127,6 +166,8 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             override fun onDrawerStateChanged(newState: Int) {}
         })
 
+
+
         // 为 currentPathTextView 添加点击事件
         TextBar.setOnClickListener {
             val isLeft = determineIfLeft()
@@ -155,6 +196,20 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
 
     private fun determineIfLeft(): Boolean {
         return currentPathTextView.text.toString() == leftPath
+    }
+
+    // 导航到指定路径（支持零宽字符绕过限制）
+    private fun navigateToPath(path: String) {
+        val isLeft = determineIfLeft()
+
+        
+        if (isLeft) {
+            leftPath = path
+            refreshList(true, path)
+        } else {
+            rightPath = path
+            refreshList(false, path)
+        }
     }
 
     // 截断路径显示，保留后46个字符，前面加上...
@@ -256,7 +311,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         val files = getFilesFromDirectory(newPath)
         val newFileList = addParentDirectory(files, newPath)
 
-        // ✅ 重用 Adapter，只更新数据
+        //  重用 Adapter，只更新数据
         val adapter = if (isLeft) leftAdapter else rightAdapter
 
         if (adapter != null) {
@@ -276,6 +331,26 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
 
     // 扩展函数：dp转px
     private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
+
+    // 获取状态栏高度
+    private fun getStatusBarHeight(): Int {
+        var result = 0
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        if (resourceId > 0) {
+            result = resources.getDimensionPixelSize(resourceId)
+        }
+        return result
+    }
+
+    // 获取导航栏高度
+    private fun getNavigationBarHeight(): Int {
+        var result = 0
+        val resourceId = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        if (resourceId > 0) {
+            result = resources.getDimensionPixelSize(resourceId)
+        }
+        return result
+    }
 
     // 显示权限请求对话框
     @RequiresApi(Build.VERSION_CODES.R)
@@ -338,6 +413,13 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         recyclerViewLeft.adapter = leftAdapter
         leftPath = "/storage/emulated/0/"
         updateFolderAndFileCount(leftPath, true)
+        
+        // 连接左侧RecyclerView和滑块覆盖层
+        recyclerViewLeft.setScrollbarStateListener(object : FastScrollRecyclerView.ScrollbarStateListener {
+            override fun onScrollbarStateChanged(rect: android.graphics.RectF, visible: Boolean, dragging: Boolean, alpha: Float) {
+                leftScrollbarOverlay.updateScrollbar(rect, visible, dragging, alpha)
+            }
+        })
 
         val recyclerViewRight: FastScrollRecyclerView = findViewById(R.id.recyclerViewRight)
         recyclerViewRight.layoutManager = LinearLayoutManager(this)
@@ -346,18 +428,40 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         recyclerViewRight.adapter = rightAdapter
         rightPath = "/storage/emulated/0/"
         updateFolderAndFileCount(rightPath, false)
+        
+        // 连接右侧RecyclerView和滑块覆盖层
+        recyclerViewRight.setScrollbarStateListener(object : FastScrollRecyclerView.ScrollbarStateListener {
+            override fun onScrollbarStateChanged(rect: android.graphics.RectF, visible: Boolean, dragging: Boolean, alpha: Float) {
+                rightScrollbarOverlay.updateScrollbar(rect, visible, dragging, alpha)
+            }
+        })
 
         // 添加左右滑动支持
-        val leftTouchHelper = ItemTouchHelper(ItemTouchHelperCallback())
+        val leftTouchHelper = ItemTouchHelper(ItemTouchHelperCallback { position ->
+            leftAdapter?.selectIfNotSelected(position)
+        })
         leftTouchHelper.attachToRecyclerView(recyclerViewLeft)
 
-        val rightTouchHelper = ItemTouchHelper(ItemTouchHelperCallback())
+        val rightTouchHelper = ItemTouchHelper(ItemTouchHelperCallback { position ->
+            rightAdapter?.selectIfNotSelected(position)
+        })
         rightTouchHelper.attachToRecyclerView(recyclerViewRight)
 
         recyclerViewLeft.addOnScrollListener(createScrollListener(true))
         recyclerViewRight.addOnScrollListener(createScrollListener(false))
         recyclerViewLeft.setOnTouchListener(createTouchListener(true))
         recyclerViewRight.setOnTouchListener(createTouchListener(false))
+
+        // 设置下拉开始监听器
+        pullRefreshLeft.onPullStartListener = {
+            currentPathTextView.text = truncatePath(leftPath)
+            setStorageInfo(leftPath)
+        }
+
+        pullRefreshRight.onPullStartListener = {
+            currentPathTextView.text = truncatePath(rightPath)
+            setStorageInfo(rightPath)
+        }
 
         // 设置下拉刷新监听器
         pullRefreshLeft.setOnRefreshListener {
@@ -413,11 +517,11 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
                 super.onScrolled(recyclerView, dx, dy)
                 if (dy != 0) {
                     if (isLeft) {
-                        currentPathTextView.text = truncatePath(leftPath)  // 使用截断函数
-                        storageInfoTextView.text = getString(R.string.storage_info_text, leftFolderCount, leftFileCount, getStorageInfo(leftPath))
+                        currentPathTextView.text = truncatePath(leftPath)
+                        setStorageInfo(leftPath)
                     } else {
-                        currentPathTextView.text = truncatePath(rightPath)  // 使用截断函数
-                        storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
+                        currentPathTextView.text = truncatePath(rightPath)
+                        setStorageInfo(rightPath)
                     }
                 }
 
@@ -469,11 +573,11 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             if (event.action == MotionEvent.ACTION_DOWN) {
 
                 if (isLeft) {
-                    currentPathTextView.text = truncatePath(leftPath)  // 使用截断函数
-                    storageInfoTextView.text = getString(R.string.storage_info_text, leftFolderCount, leftFileCount, getStorageInfo(leftPath))
+                    currentPathTextView.text = truncatePath(leftPath)
+                    setStorageInfo(leftPath)
                 } else {
-                    currentPathTextView.text = truncatePath(rightPath)  // 使用截断函数
-                    storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
+                    currentPathTextView.text = truncatePath(rightPath)
+                    setStorageInfo(rightPath)
                 }
 
             }
@@ -484,17 +588,18 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
     // 处理文件项点击事件
     override fun onItemClick(file: File, isLeft: Boolean) {
         if (isLeft) {
-            currentPathTextView.text = truncatePath(leftPath)  // 使用截断函数
-            storageInfoTextView.text = getString(R.string.storage_info_text, leftFolderCount, leftFileCount, getStorageInfo(leftPath))
+            currentPathTextView.text = truncatePath(leftPath)
+            setStorageInfo(leftPath)
         } else {
-            currentPathTextView.text = truncatePath(rightPath)  // 使用截断函数
-            storageInfoTextView.text = getString(R.string.storage_info_text, rightFolderCount, rightFileCount, getStorageInfo(rightPath))
+            currentPathTextView.text = truncatePath(rightPath)
+            setStorageInfo(rightPath)
         }
 
         if (file.name == "..") {
             val currentPath = if (isLeft) leftPath else rightPath
             val currentDirectory = File(currentPath)
             val parentPath = currentDirectory.parent ?: return
+
             val files = getFilesFromDirectory(parentPath)
 
             val adapter = if (isLeft) leftAdapter else rightAdapter
@@ -584,9 +689,11 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         dialog.show()
     }
 
-    // 获取目录中的文件列表
+    // 获取目录中的文件列表（支持零宽字符绕过限制）
     private fun getFilesFromDirectory(path: String): List<File> {
-        val directory = File(path)
+        // 使用PathUtils处理路径，自动添加零宽字符绕过限制
+        val cleanPath = PathUtils.removeZeroWidthChar(path)
+        val directory = PathUtils.getFile(cleanPath)
         val files = directory.listFiles()?.toList() ?: emptyList()
 
         val directories = files.filter { it.isDirectory }.sortedBy { it.name }
@@ -595,11 +702,12 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         return directories + regularFiles
     }
 
-    // 添加父目录项
+    // 添加父目录项（支持零宽字符路径）
     private fun addParentDirectory(files: List<File>, currentPath: String): List<CustomFile> {
-        val currentDirectory = File(currentPath)
+        val cleanPath = PathUtils.removeZeroWidthChar(currentPath)
+        val currentDirectory = PathUtils.getFile(cleanPath)
         val parentDirectory = currentDirectory.parentFile
-        return if (parentDirectory != null && currentPath != "/") {
+        return if (parentDirectory != null && cleanPath != "/") {
             val parentFile = CustomFile(File(parentDirectory, ".."), true)
             listOf(parentFile) + files.map { CustomFile(it, false) }
         } else {
@@ -636,9 +744,10 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         }
     }
 
-    // 获取文件夹和文件数量
+    // 获取文件夹和文件数量（支持零宽字符路径）
     private fun getFolderAndFileCount(path: String): Pair<Int, Int> {
-        val directory = File(path)
+        val cleanPath = PathUtils.removeZeroWidthChar(path)
+        val directory = PathUtils.getFile(cleanPath)
         var folderCount = 0
         var fileCount = 0
         directory.listFiles()?.forEach {
@@ -651,14 +760,30 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         return Pair(folderCount, fileCount)
     }
 
-    // 获取存储信息
+    // 获取存储信息（支持零宽字符路径）
     @SuppressLint("DefaultLocale")
     private fun getStorageInfo(path: String): String {
-        val stat = StatFs(path)
-        val availableBytes = stat.availableBytes.toDouble()
-        val totalBytes = stat.totalBytes.toDouble()
-        val availableGB = availableBytes / (1024 * 1024 * 1024)
-        val totalGB = totalBytes / (1024 * 1024 * 1024)
-        return String.format("%.2fG/%.2fG", availableGB, totalGB)
+        return try {
+            // 清理路径中的零宽字符
+            val cleanPath = PathUtils.removeZeroWidthChar(path)
+            
+            // 对于Android/data和Android/obb目录，使用其父目录来获取存储信息
+            val statPath = if (cleanPath.contains("/Android/data") || cleanPath.contains("/Android/obb")) {
+                // 使用存储根目录
+                "/storage/emulated/0"
+            } else {
+                cleanPath
+            }
+            
+            val stat = StatFs(statPath)
+            val availableBytes = stat.availableBytes.toDouble()
+            val totalBytes = stat.totalBytes.toDouble()
+            val availableGB = availableBytes / (1024 * 1024 * 1024)
+            val totalGB = totalBytes / (1024 * 1024 * 1024)
+            String.format("%.2fG/%.2fG", availableGB, totalGB)
+        } catch (e: Exception) {
+            // 如果获取失败，返回默认值
+            "N/A"
+        }
     }
 }

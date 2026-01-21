@@ -7,4 +7,5 @@
     <color name="file_color">#FF607D8B</color>
     <color name="DialogButtonColor">#039BE5</color>
     <color name="DialogSelectedColor">#FFB3DCFC</color>
+    <color name="item_selected">#FF65C0DF</color>
 </resources>

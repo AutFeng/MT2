@@ -6,7 +6,8 @@
     </style>
 
     <style name="AppTheme" parent="Base.AppTheme">
-        <item name="android:statusBarColor">@color/toolbar</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentStatus">false</item>
     </style>
 
     <style name="DialogScaleAnimation" parent="@android:style/Animation.Dialog">

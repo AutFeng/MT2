@@ -20,6 +20,17 @@ import kotlin.math.abs
  */
 class FastScrollRecyclerView : RecyclerView {
 
+    // ==================== 滚动条状态回调 ====================
+    interface ScrollbarStateListener {
+        fun onScrollbarStateChanged(rect: RectF, visible: Boolean, dragging: Boolean, alpha: Float)
+    }
+    
+    private var scrollbarStateListener: ScrollbarStateListener? = null
+    
+    fun setScrollbarStateListener(listener: ScrollbarStateListener?) {
+        this.scrollbarStateListener = listener
+    }
+
     // ==================== 滚动条尺寸配置 ====================
     private var fastScrollerWidth: Int = dpToPx(8)
     private var fastScrollerMargin: Int = dpToPx(0)
@@ -150,14 +161,28 @@ class FastScrollRecyclerView : RecyclerView {
     override fun dispatchDraw(canvas: Canvas) {
         super.dispatchDraw(canvas)
 
-        // 只在需要时绘制滚动条
+        // 不再自己绘制滑块，而是通知外部ScrollbarOverlayView
+        notifyScrollbarState()
+    }
+    
+    /**
+     * 通知滑块状态变化
+     */
+    private fun notifyScrollbarState() {
         if (shouldDrawFastScroller()) {
-            val paint = getCurrentPaint()
-            canvas.drawRoundRect(
+            val alpha = if (isHiding) (1 - hideAnimationProgress) else 1f
+            scrollbarStateListener?.onScrollbarStateChanged(
                 getCurrentRect(),
-                fastScrollerCornerRadius.toFloat(),
-                fastScrollerCornerRadius.toFloat(),
-                paint
+                true,
+                isDraggingFastScroller,
+                alpha
+            )
+        } else {
+            scrollbarStateListener?.onScrollbarStateChanged(
+                RectF(),
+                false,
+                false,
+                0f
             )
         }
     }
