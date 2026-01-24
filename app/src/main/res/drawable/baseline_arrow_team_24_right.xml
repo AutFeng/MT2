@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:height="24dp"
+    android:width="24dp"
+    android:viewportWidth="24.0"
+    android:viewportHeight="24.0">
+    <!-- 左下角箭头 - 100%透明度 -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M6.5,11.3v3.2h7.5v2.2h-7.5v3.2L2.1,15.6z" />
+    <!-- 右上角箭头 - 50%透明度（右边选中时） -->
+    <path
+        android:fillColor="#80000000"
+        android:pathData="M17.5,4.7v3.2h-7.5v2.2h7.5v3.2L21.9,9z" />
+</vector>

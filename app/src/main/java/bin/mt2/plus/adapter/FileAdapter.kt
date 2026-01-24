@@ -126,12 +126,12 @@ class FileAdapter(
 
     override fun onBindViewHolder(holder: FileViewHolder, position: Int, payloads: MutableList<Any>) {
         if (payloads.isNotEmpty() && payloads[0] == "selection") {
-            // 只更新选中状态背景色，不触发其他逻辑
+            // 只更新选中状态背景，不触发其他逻辑
             if (position in selectedPositions) {
-                holder.mainContent.setBackgroundColor(0xFF65C0DF.toInt())
-                holder.itemView.setBackgroundColor(0xFF65C0DF.toInt())
+                holder.mainContent.setBackgroundResource(R.drawable.item_background_selected)
+                holder.itemView.setBackgroundResource(R.drawable.item_background_selected)
             } else {
-                holder.mainContent.setBackgroundColor(Color.TRANSPARENT)
+                holder.mainContent.setBackgroundResource(R.drawable.item_background_normal)
                 holder.itemView.setBackgroundColor(Color.TRANSPARENT)
             }
         } else {
@@ -171,12 +171,12 @@ class FileAdapter(
             }, 50L)
         }
 
-        // 设置选中状态背景色（在动画之后设置，避免冲突）
+        // 设置选中状态背景（在动画之后设置，避免冲突）
         if (position in selectedPositions) {
-            holder.mainContent.setBackgroundColor(0xFF65C0DF.toInt())
-            holder.itemView.setBackgroundColor(0xFF65C0DF.toInt())
+            holder.mainContent.setBackgroundResource(R.drawable.item_background_selected)
+            holder.itemView.setBackgroundResource(R.drawable.item_background_selected)
         } else {
-            holder.mainContent.setBackgroundColor(Color.TRANSPARENT)
+            holder.mainContent.setBackgroundResource(R.drawable.item_background_normal)
             holder.itemView.setBackgroundColor(Color.TRANSPARENT)
         }
 
@@ -190,6 +190,13 @@ class FileAdapter(
         }
 
         holder.fileName.text = displayName
+
+        // 设置文件名颜色：新创建的显示绿色，其他显示黑色
+        if (customFile.isNewlyCreated) {
+            holder.fileName.setTextColor(0xFF00C853.toInt()) // 绿色
+        } else {
+            holder.fileName.setTextColor(0xFF000000.toInt()) // 黑色
+        }
 
         // 处理时间显示
         if (customFile.isParent) {

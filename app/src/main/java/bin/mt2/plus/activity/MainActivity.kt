@@ -42,6 +42,14 @@ import bin.mt2.plus.widget.ScrollbarOverlayView
 import com.google.android.material.navigation.NavigationView
 import java.io.File
 
+/**
+ * 历史记录条目，包含路径和滚动位置
+ */
+data class HistoryEntry(
+    val path: String,
+    val scrollPosition: Int
+)
+
 class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
 
     private var leftAdapter: FileAdapter? = null
@@ -69,13 +77,27 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
     private lateinit var bottomBar: LinearLayout
     private lateinit var leftScrollbarOverlay: ScrollbarOverlayView
     private lateinit var rightScrollbarOverlay: ScrollbarOverlayView
+    private lateinit var arrowTeamIcon: ImageView
+    private lateinit var addIcon: ImageView
+    private lateinit var backIcon: ImageView
+    private lateinit var forwardIcon: ImageView
+    private lateinit var moreIcon: ImageView
 
     private var isInitialized = false
+
+    // 跟踪当前选中的列表（true=左边，false=右边）
+    private var isLeftSelected = true
 
     private var leftFolderCount = 0
     private var leftFileCount = 0
     private var rightFolderCount = 0
     private var rightFileCount = 0
+
+    // 历史记录栈（左右列表独立，包含路径和滚动位置）
+    private val leftHistoryStack = mutableListOf<HistoryEntry>()
+    private val leftForwardStack = mutableListOf<HistoryEntry>()
+    private val rightHistoryStack = mutableListOf<HistoryEntry>()
+    private val rightForwardStack = mutableListOf<HistoryEntry>()
 
     private var permissionDialog: AlertDialog? = null
 
@@ -84,11 +106,54 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // 设置软键盘模式，防止键盘弹出时调整布局导致顶部文本被裁断
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+
         // 初始化 Toolbar
         toolbar = findViewById(R.id.toolbar)
         bottomBar = findViewById(R.id.bottomBar)
         leftScrollbarOverlay = findViewById(R.id.leftScrollbarContainer)
         rightScrollbarOverlay = findViewById(R.id.rightScrollbarContainer)
+        arrowTeamIcon = findViewById(R.id.arrowTeamIcon)
+        addIcon = findViewById(R.id.addIcon)
+        backIcon = findViewById(R.id.backIcon)
+        forwardIcon = findViewById(R.id.forwardIcon)
+        moreIcon = findViewById(R.id.moreIcon)
+
+        // 设置后退按钮点击事件
+        backIcon.setOnClickListener {
+            navigateBack()
+        }
+
+        // 设置前进按钮点击事件
+        forwardIcon.setOnClickListener {
+            navigateForward()
+        }
+
+        // 设置更多按钮点击事件
+        moreIcon.setOnClickListener {
+            showMoreMenu()
+        }
+
+        // 设置图标点击事件：同步两个列表的路径
+        arrowTeamIcon.setOnClickListener {
+            if (isLeftSelected) {
+                // 当前在左列表，同步右列表到左列表的路径
+                rightPath = leftPath
+                refreshList(false, rightPath)
+                updateFolderAndFileCount(rightPath, false)
+            } else {
+                // 当前在右列表，同步左列表到右列表的路径
+                leftPath = rightPath
+                refreshList(true, leftPath)
+                updateFolderAndFileCount(leftPath, true)
+            }
+        }
+
+        // 设置添加按钮点击事件：显示编辑框弹窗
+        addIcon.setOnClickListener {
+            showAddDialog()
+        }
 
         // 设置沉浸式状态栏和导航栏
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -124,6 +189,12 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             val layoutParams = toolbar.layoutParams
             layoutParams.height = 56.dpToPx(this) + statusBarHeight
             toolbar.layoutParams = layoutParams
+        }
+
+        // 设置 bottomBar 的 padding 以适配导航栏
+        bottomBar.post {
+            val navigationBarHeight = getNavigationBarHeight()
+            bottomBar.setPadding(0, 0, 0, navigationBarHeight)
         }
 
         // 初始化视图
@@ -198,11 +269,114 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         return currentPathTextView.text.toString() == leftPath
     }
 
+    // 显示更多菜单（从图标右上角展开并遮住图标）
+    private fun showMoreMenu() {
+        // 创建自定义布局
+        val popupView = layoutInflater.inflate(R.layout.popup_more_menu, null)
+
+        // 获取屏幕宽度
+        val screenWidth = resources.displayMetrics.widthPixels
+
+        // 设置菜单宽度为屏幕宽度的 47%
+        val menuWidth = (screenWidth * 0.47).toInt()
+
+        // 创建 PopupWindow，直接设置宽度
+        val popupWindow = android.widget.PopupWindow(
+            popupView,
+            menuWidth,  // 直接设置宽度
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        )
+
+        // 设置背景（使用白色背景以支持 elevation 阴影）
+        popupWindow.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE))
+
+        // 设置自定义动画（从右上角展开和淡出）
+        popupWindow.animationStyle = R.style.PopupMenuAnimation
+
+        // 获取 Toolbar 位置（从 Toolbar 顶部开始展开）
+        val location = IntArray(2)
+        toolbar.getLocationOnScreen(location)
+        val toolbarY = location[1]
+
+        // 计算 PopupWindow 位置（右边缘紧贴屏幕右边缘，顶部对齐 Toolbar 顶部）
+        val x = screenWidth - menuWidth
+        val y = toolbarY
+
+        // 设置菜单项点击事件
+        popupView.findViewById<TextView>(R.id.menu_refresh).setOnClickListener {
+            android.widget.Toast.makeText(this, "刷新功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_search).setOnClickListener {
+            android.widget.Toast.makeText(this, "搜索功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_select_all).setOnClickListener {
+            android.widget.Toast.makeText(this, "全选功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_filter).setOnClickListener {
+            android.widget.Toast.makeText(this, "过滤功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_sort).setOnClickListener {
+            android.widget.Toast.makeText(this, "排序方式功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_terminal).setOnClickListener {
+            android.widget.Toast.makeText(this, "打开终端功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_hidden_files).setOnClickListener {
+            android.widget.Toast.makeText(this, "隐藏文件功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_bookmark).setOnClickListener {
+            android.widget.Toast.makeText(this, "添加书签功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_set_home).setOnClickListener {
+            android.widget.Toast.makeText(this, "设为首页功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_settings).setOnClickListener {
+            android.widget.Toast.makeText(this, "设置功能待实现", android.widget.Toast.LENGTH_SHORT).show()
+            popupWindow.dismiss()
+        }
+
+        popupView.findViewById<TextView>(R.id.menu_exit).setOnClickListener {
+            popupWindow.dismiss()
+            finish()
+        }
+
+        // 显示 PopupWindow（使用屏幕坐标）
+        popupWindow.showAtLocation(moreIcon, android.view.Gravity.NO_GRAVITY, x, y)
+    }
+
+    // 显示关于对话框
+    private fun showAboutDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("关于")
+            .setMessage("MT2 文件管理器\n版本：1.0")
+            .setPositiveButton("确定", null)
+            .show()
+    }
+
     // 导航到指定路径（支持零宽字符绕过限制）
     private fun navigateToPath(path: String) {
         val isLeft = determineIfLeft()
 
-        
+
         if (isLeft) {
             leftPath = path
             refreshList(true, path)
@@ -212,13 +386,114 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         }
     }
 
-    // 截断路径显示，保留后46个字符，前面加上...
-    private fun truncatePath(path: String): String {
-        return if (path.length > 46) {
-            "..." + path.takeLast(46)
-        } else {
-            path
+    // 后退导航
+    private fun navigateBack() {
+        val isLeft = isLeftSelected
+        val historyStack = if (isLeft) leftHistoryStack else rightHistoryStack
+        val forwardStack = if (isLeft) leftForwardStack else rightForwardStack
+        val currentPath = if (isLeft) leftPath else rightPath
+
+        if (historyStack.isEmpty()) {
+            return // 没有历史记录，不执行操作
         }
+
+        // 获取当前滚动位置
+        val recyclerView: FastScrollRecyclerView =
+            if (isLeft) findViewById(R.id.recyclerViewLeft)
+            else findViewById(R.id.recyclerViewRight)
+        val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+        val currentScrollPosition = layoutManager?.findFirstVisibleItemPosition() ?: 0
+
+        // 将当前路径和滚动位置压入前进栈
+        forwardStack.add(HistoryEntry(currentPath, currentScrollPosition))
+
+        // 从历史栈弹出上一个条目
+        val previousEntry = historyStack.removeAt(historyStack.size - 1)
+
+        // 保存当前路径，用于高亮显示
+        val highlightPath = currentPath.trimEnd('/')
+
+        // 导航到上一个路径（不添加到历史记录，但高亮返回的文件夹）
+        if (isLeft) {
+            leftPath = previousEntry.path
+            refreshList(true, previousEntry.path, addToHistory = false, highlightPath = highlightPath)
+        } else {
+            rightPath = previousEntry.path
+            refreshList(false, previousEntry.path, addToHistory = false, highlightPath = highlightPath)
+        }
+
+        // 恢复滚动位置
+        layoutManager?.scrollToPositionWithOffset(previousEntry.scrollPosition, 0)
+
+        // 更新箭头状态
+        updateNavigationIcons()
+    }
+
+    // 前进导航
+    private fun navigateForward() {
+        val isLeft = isLeftSelected
+        val historyStack = if (isLeft) leftHistoryStack else rightHistoryStack
+        val forwardStack = if (isLeft) leftForwardStack else rightForwardStack
+        val currentPath = if (isLeft) leftPath else rightPath
+
+        if (forwardStack.isEmpty()) {
+            return // 没有前进记录，不执行操作
+        }
+
+        // 获取当前滚动位置
+        val recyclerView: FastScrollRecyclerView =
+            if (isLeft) findViewById(R.id.recyclerViewLeft)
+            else findViewById(R.id.recyclerViewRight)
+        val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+        val currentScrollPosition = layoutManager?.findFirstVisibleItemPosition() ?: 0
+
+        // 将当前路径和滚动位置压入历史栈
+        historyStack.add(HistoryEntry(currentPath, currentScrollPosition))
+
+        // 从前进栈弹出下一个条目
+        val nextEntry = forwardStack.removeAt(forwardStack.size - 1)
+
+        // 保存当前路径，用于高亮显示
+        val highlightPath = currentPath.trimEnd('/')
+
+        // 导航到下一个路径（不添加到历史记录，但高亮返回的文件夹）
+        if (isLeft) {
+            leftPath = nextEntry.path
+            refreshList(true, nextEntry.path, addToHistory = false, highlightPath = highlightPath)
+        } else {
+            rightPath = nextEntry.path
+            refreshList(false, nextEntry.path, addToHistory = false, highlightPath = highlightPath)
+        }
+
+        // 恢复滚动位置
+        layoutManager?.scrollToPositionWithOffset(nextEntry.scrollPosition, 0)
+
+        // 更新箭头状态
+        updateNavigationIcons()
+    }
+
+    // 更新导航图标状态（根据历史记录栈状态）
+    private fun updateNavigationIcons() {
+        val isLeft = isLeftSelected
+        val historyStack = if (isLeft) leftHistoryStack else rightHistoryStack
+        val forwardStack = if (isLeft) leftForwardStack else rightForwardStack
+
+        // 更新后退按钮：有历史记录时亮起（alpha=1.0），否则半透明（alpha=0.5）
+        backIcon.alpha = if (historyStack.isNotEmpty()) 1.0f else 0.5f
+
+        // 更新前进按钮：有前进记录时亮起（alpha=1.0），否则半透明（alpha=0.5）
+        forwardIcon.alpha = if (forwardStack.isNotEmpty()) 1.0f else 0.5f
+    }
+
+    // 更新当前路径显示（不再手动截断，依赖 XML 的 ellipsize）
+    private fun truncatePath(path: String): String {
+        return path
+    }
+
+    // 更新当前路径显示
+    private fun updateCurrentPath(path: String) {
+        val updatedPath = if (path.endsWith("/")) path else "$path/"
+        currentPathTextView.text = updatedPath
     }
 
     @SuppressLint("DiscouragedPrivateApi")
@@ -303,7 +578,7 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         dialog.show()
     }
 
-    private fun refreshList(isLeft: Boolean, newPath: String) {
+    private fun refreshList(isLeft: Boolean, newPath: String, addToHistory: Boolean = true, highlightPath: String? = null) {
         val recyclerView: FastScrollRecyclerView =
             if (isLeft) findViewById(R.id.recyclerViewLeft)
             else findViewById(R.id.recyclerViewRight)
@@ -327,6 +602,25 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         updateCurrentPath(newPath)
         setStorageInfo(newPath)
 
+        // 如果需要高亮某个路径（触发水波纹效果）
+        if (highlightPath != null) {
+            recyclerView.post {
+                val position = newFileList.indexOfFirst { it.file.absolutePath == highlightPath }
+                if (position != -1) {
+                    val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                    layoutManager?.findViewByPosition(position)?.let { itemView ->
+                        // 触发水波纹效果
+                        itemView.isPressed = true
+                        itemView.postDelayed({
+                            itemView.isPressed = false
+                        }, 300)
+                    }
+                }
+            }
+        }
+
+        // 更新导航图标状态
+        updateNavigationIcons()
     }
 
     // 扩展函数：dp转px
@@ -350,6 +644,211 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
             result = resources.getDimensionPixelSize(resourceId)
         }
         return result
+    }
+
+    // 带渐变效果的图标切换方法（交叉渐变融合）
+    private fun updateArrowTeamIcon(isLeft: Boolean) {
+        // 更新当前选中状态
+        isLeftSelected = isLeft
+
+        val newDrawableRes = if (isLeft) {
+            R.drawable.baseline_arrow_team_24_left
+        } else {
+            R.drawable.baseline_arrow_team_24_right
+        }
+
+        // 创建一个临时ImageView来显示旧图标
+        val tempImageView = ImageView(this).apply {
+            setImageDrawable(arrowTeamIcon.drawable)
+            imageTintList = arrowTeamIcon.imageTintList
+            scaleType = arrowTeamIcon.scaleType
+        }
+
+        // 获取原ImageView在屏幕上的位置
+        val location = IntArray(2)
+        arrowTeamIcon.getLocationInWindow(location)
+
+        // 将临时ImageView添加到根布局，使用绝对定位
+        val rootLayout = findViewById<ViewGroup>(android.R.id.content)
+        val params = ViewGroup.LayoutParams(
+            arrowTeamIcon.width,
+            arrowTeamIcon.height
+        )
+        tempImageView.layoutParams = params
+        tempImageView.x = location[0].toFloat()
+        tempImageView.y = location[1].toFloat()
+        rootLayout.addView(tempImageView)
+
+        // 立即切换原ImageView的图标并设置为透明
+        arrowTeamIcon.setImageResource(newDrawableRes)
+        arrowTeamIcon.alpha = 0f
+
+        // 同时执行两个动画：旧图标淡出，新图标淡入
+        tempImageView.animate()
+            .alpha(0f)
+            .setDuration(200)
+            .withEndAction {
+                // 动画结束后移除临时ImageView
+                rootLayout.removeView(tempImageView)
+            }
+            .start()
+
+        arrowTeamIcon.animate()
+            .alpha(1f)
+            .setDuration(200)
+            .start()
+    }
+
+    // 显示添加弹窗（创建文件夹或文件）
+    private fun showAddDialog() {
+        val currentPath = if (isLeftSelected) leftPath else rightPath
+
+        // 创建容器并设置padding
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dpToPx(this@MainActivity), 0, 24.dpToPx(this@MainActivity), 0)
+        }
+
+        // 创建编辑框
+        val editText = EditText(this).apply {
+            setSingleLine(true)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            highlightColor = ContextCompat.getColor(this@MainActivity, R.color.DialogSelectedColor)
+            backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.DialogButtonColor))
+            // 设置光标颜色
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                textCursorDrawable = ContextCompat.getDrawable(this@MainActivity, R.drawable.cursor_color)
+            } else {
+                try {
+                    val f = TextView::class.java.getDeclaredField("mCursorDrawableRes")
+                    f.isAccessible = true
+                    f.set(this, R.drawable.cursor_color)
+                } catch (ignored: Exception) {
+                }
+            }
+        }
+
+        container.addView(editText)
+
+        // 创建弹窗
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("创建")
+            .setView(container)
+            .setPositiveButton("文件夹") { _, _ ->
+                val name = editText.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    createFolder(name, currentPath)
+                }
+            }
+            .setNegativeButton("文件") { _, _ ->
+                val name = editText.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    createFile(name, currentPath)
+                }
+            }
+            .setNeutralButton("取消", null)
+            .create()
+
+        // 设置按钮文字颜色
+        dialog.setOnShowListener {
+            val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+            val neutralButton = dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+            positiveButton.setTextColor(ContextCompat.getColor(this, R.color.DialogButtonColor))
+            negativeButton.setTextColor(ContextCompat.getColor(this, R.color.DialogButtonColor))
+            neutralButton.setTextColor(ContextCompat.getColor(this, R.color.DialogButtonColor))
+
+            // 显示键盘并获取焦点
+            editText.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            Handler().postDelayed({
+                imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+            }, 100)
+        }
+
+        // 设置对话框的软键盘模式，防止键盘弹出时调整主窗口布局
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+
+        // 显示弹窗
+        dialog.show()
+    }
+
+    // 创建文件夹
+    private fun createFolder(name: String, parentPath: String) {
+        val newFolder = File(parentPath, name)
+        if (newFolder.exists()) {
+            android.widget.Toast.makeText(this, "文件夹已存在", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (newFolder.mkdir()) {
+            android.widget.Toast.makeText(this, "文件夹创建成功", android.widget.Toast.LENGTH_SHORT).show()
+            // 刷新当前列表并定位到新创建的项
+            refreshListAndScrollToNew(isLeftSelected, parentPath, newFolder.name)
+        } else {
+            android.widget.Toast.makeText(this, "文件夹创建失败", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // 创建文件
+    private fun createFile(name: String, parentPath: String) {
+        val newFile = File(parentPath, name)
+        if (newFile.exists()) {
+            android.widget.Toast.makeText(this, "文件已存在", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            if (newFile.createNewFile()) {
+                android.widget.Toast.makeText(this, "文件创建成功", android.widget.Toast.LENGTH_SHORT).show()
+                // 刷新当前列表并定位到新创建的项
+                refreshListAndScrollToNew(isLeftSelected, parentPath, newFile.name)
+            } else {
+                android.widget.Toast.makeText(this, "文件创建失败", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(this, "创建失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // 刷新列表并滚动到新创建的项
+    private fun refreshListAndScrollToNew(isLeft: Boolean, path: String, newFileName: String) {
+        val recyclerView: FastScrollRecyclerView =
+            if (isLeft) findViewById(R.id.recyclerViewLeft)
+            else findViewById(R.id.recyclerViewRight)
+
+        val files = getFilesFromDirectory(path)
+        val fileListWithParent = addParentDirectory(files, path)
+
+        // 标记新创建的文件
+        val updatedList = fileListWithParent.map { customFile ->
+            if (customFile.file.name == newFileName) {
+                CustomFile(customFile.file, customFile.isParent, true)
+            } else {
+                customFile
+            }
+        }
+
+        // 更新Adapter
+        val adapter = if (isLeft) leftAdapter else rightAdapter
+        adapter?.updateData(updatedList)
+
+        // 更新TextBar显示
+        currentPathTextView.text = truncatePath(path)
+        setStorageInfo(path)
+
+        // 更新文件夹和文件计数
+        updateFolderAndFileCount(path, isLeft)
+
+        // 找到新创建项的位置并立即跳转
+        val newItemPosition = updatedList.indexOfFirst { it.file.name == newFileName }
+        if (newItemPosition != -1) {
+            val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+            layoutManager?.scrollToPositionWithOffset(newItemPosition, 0)
+        }
     }
 
     // 显示权限请求对话框
@@ -456,11 +955,15 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         pullRefreshLeft.onPullStartListener = {
             currentPathTextView.text = truncatePath(leftPath)
             setStorageInfo(leftPath)
+            // 更新图标为左边选中状态（带渐变效果）
+            updateArrowTeamIcon(true)
         }
 
         pullRefreshRight.onPullStartListener = {
             currentPathTextView.text = truncatePath(rightPath)
             setStorageInfo(rightPath)
+            // 更新图标为右边选中状态（带渐变效果）
+            updateArrowTeamIcon(false)
         }
 
         // 设置下拉刷新监听器
@@ -482,6 +985,9 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         setStorageInfo("/storage/emulated/0/")
 
         isInitialized = true
+
+        // 初始化导航图标状态（历史记录栈为空，所以两个箭头都应该是半透明）
+        updateNavigationIcons()
 
         pullRefreshLeft.setOnTouchListener { _, _ ->
 
@@ -519,9 +1025,13 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
                     if (isLeft) {
                         currentPathTextView.text = truncatePath(leftPath)
                         setStorageInfo(leftPath)
+                        // 更新图标为左边选中状态（带渐变效果）
+                        updateArrowTeamIcon(true)
                     } else {
                         currentPathTextView.text = truncatePath(rightPath)
                         setStorageInfo(rightPath)
+                        // 更新图标为右边选中状态（带渐变效果）
+                        updateArrowTeamIcon(false)
                     }
                 }
 
@@ -561,6 +1071,8 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
                 leftTopBezierGradient.visibility = View.GONE
                 leftBottomBezierGradient.visibility = View.GONE
                 leftRithtBezierGradient.visibility = View.GONE
+                // 切换到左边选中的图标（带渐变效果）
+                updateArrowTeamIcon(true)
             } else {
                 leftTopBezierGradient.visibility = View.VISIBLE
                 leftBottomBezierGradient.visibility = View.VISIBLE
@@ -568,6 +1080,8 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
                 rightTopBezierGradient.visibility = View.GONE
                 rightBottomBezierGradient.visibility = View.GONE
                 rightLeftBezierGradient.visibility = View.GONE
+                // 切换到右边选中的图标（带渐变效果）
+                updateArrowTeamIcon(false)
             }
 
             if (event.action == MotionEvent.ACTION_DOWN) {
@@ -590,48 +1104,76 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         if (isLeft) {
             currentPathTextView.text = truncatePath(leftPath)
             setStorageInfo(leftPath)
+            // 更新图标为左边选中状态（带渐变效果）
+            updateArrowTeamIcon(true)
         } else {
             currentPathTextView.text = truncatePath(rightPath)
             setStorageInfo(rightPath)
+            // 更新图标为右边选中状态（带渐变效果）
+            updateArrowTeamIcon(false)
         }
 
         if (file.name == "..") {
             val currentPath = if (isLeft) leftPath else rightPath
             val currentDirectory = File(currentPath)
             val parentPath = currentDirectory.parent ?: return
+            val historyStack = if (isLeft) leftHistoryStack else rightHistoryStack
 
-            val files = getFilesFromDirectory(parentPath)
-
-            val adapter = if (isLeft) leftAdapter else rightAdapter
-            adapter?.updateData(addParentDirectory(files, parentPath))
-
-            if (isLeft) {
-                leftPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
-                updateFolderAndFileCount(leftPath, true)
-                updateCurrentPath(parentPath)
-                setStorageInfo(parentPath)
+            // 检查历史记录中最后一个条目是否是父目录
+            val lastEntry = historyStack.lastOrNull()
+            if (lastEntry != null && lastEntry.path == (if (parentPath.endsWith("/")) parentPath else "$parentPath/")) {
+                // 如果历史记录中有父目录，使用后退功能恢复位置
+                navigateBack()
             } else {
-                rightPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
-                updateFolderAndFileCount(rightPath, false)
-                updateCurrentPath(parentPath)
-                setStorageInfo(parentPath)
+                // 否则正常返回父目录（从顶部开始）
+                val forwardStack = if (isLeft) leftForwardStack else rightForwardStack
+
+                // 获取当前滚动位置
+                val recyclerView: FastScrollRecyclerView =
+                    if (isLeft) findViewById(R.id.recyclerViewLeft)
+                    else findViewById(R.id.recyclerViewRight)
+                val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                val currentScrollPosition = layoutManager?.findFirstVisibleItemPosition() ?: 0
+
+                // 添加当前路径和滚动位置到历史记录
+                historyStack.add(HistoryEntry(currentPath, currentScrollPosition))
+                // 清空前进栈（因为进入了新路径）
+                forwardStack.clear()
+
+                // 返回父目录
+                if (isLeft) {
+                    leftPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
+                    refreshList(true, leftPath, addToHistory = false)
+                } else {
+                    rightPath = if (parentPath.endsWith("/")) parentPath else "$parentPath/"
+                    refreshList(false, rightPath, addToHistory = false)
+                }
             }
         } else if (file.isDirectory) {
-            val files = getFilesFromDirectory(file.path)
+            // 点击文件夹进入，添加当前路径和滚动位置到历史记录
+            val currentPath = if (isLeft) leftPath else rightPath
+            val historyStack = if (isLeft) leftHistoryStack else rightHistoryStack
+            val forwardStack = if (isLeft) leftForwardStack else rightForwardStack
 
-            val adapter = if (isLeft) leftAdapter else rightAdapter
-            adapter?.updateData(addParentDirectory(files, file.path))
+            // 获取当前滚动位置
+            val recyclerView: FastScrollRecyclerView =
+                if (isLeft) findViewById(R.id.recyclerViewLeft)
+                else findViewById(R.id.recyclerViewRight)
+            val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+            val currentScrollPosition = layoutManager?.findFirstVisibleItemPosition() ?: 0
 
+            // 添加当前路径和滚动位置到历史记录
+            historyStack.add(HistoryEntry(currentPath, currentScrollPosition))
+            // 清空前进栈（因为进入了新路径）
+            forwardStack.clear()
+
+            // 进入新文件夹
             if (isLeft) {
                 leftPath = if (file.path.endsWith("/")) file.path else "${file.path}/"
-                updateFolderAndFileCount(leftPath, true)
-                updateCurrentPath(file.path)
-                setStorageInfo(file.path)
+                refreshList(true, leftPath, addToHistory = false)
             } else {
                 rightPath = if (file.path.endsWith("/")) file.path else "${file.path}/"
-                updateFolderAndFileCount(rightPath, false)
-                updateCurrentPath(file.path)
-                setStorageInfo(file.path)
+                refreshList(false, rightPath, addToHistory = false)
             }
         }
         if (isLeft) {
@@ -713,12 +1255,6 @@ class MainActivity : AppCompatActivity(), FileAdapter.OnItemClickListener {
         } else {
             files.map { CustomFile(it, false) }
         }
-    }
-
-    // 在更新当前路径的方法中修改
-    private fun updateCurrentPath(path: String) {
-        val updatedPath = if (path.endsWith("/")) path else "$path/"
-        currentPathTextView.text = truncatePath(updatedPath)  // 使用截断函数
     }
 
     // 设置存储信息
